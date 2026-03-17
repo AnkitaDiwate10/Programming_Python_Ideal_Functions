@@ -74,5 +74,7 @@ def main():
     visualizer = Visualizer()
     visualizer.plot_data(train_data, ideal_data, test_data)
 
+    print("Project version updated")
+
 if __name__ == "__main__":
     main()
