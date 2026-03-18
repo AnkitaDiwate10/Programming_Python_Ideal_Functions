@@ -7,74 +7,76 @@ from src.visualization import Visualizer
 
 
 def main():
+    try:
+        loader = DataLoader()
 
-    loader = DataLoader()
+        train_data = loader.load_training_data("data/train.csv")
+        ideal_data = loader.load_ideal_functions("data/ideal.csv")
+        test_data = loader.load_test_data("data/test.csv")
 
-    train_data = loader.load_training_data("data/train.csv")
-    ideal_data = loader.load_ideal_functions("data/ideal.csv")
-    test_data = loader.load_test_data("data/test.csv")
+        # Step 1: Select best ideal functions
+        selector = IdealFunctionSelector()
 
+        best_functions = {}
 
-    # Step 1: Select best ideal functions
-    selector = IdealFunctionSelector()
+        for column in train_data.columns[1:]:
+            best_func, error = selector.find_best_function(
+                train_data[column],
+                ideal_data
+            )
+            best_functions[column] = best_func
 
-    best_functions = {}
+        print("\nSelected Ideal Functions:")
+        print(best_functions)
 
-    for column in train_data.columns[1:]:
+        # Step 2: Map test data
+        mapper = TestMapper()
 
-        best_func, error = selector.find_best_function(
-            train_data[column],
-            ideal_data
-        )
+        mapped_results = []
 
-        best_functions[column] = best_func
+        for index, row in test_data.iterrows():
+            x_test = row["x"]
+            y_test = row["y"]
 
-    print("\nSelected Ideal Functions:")
-    print(best_functions)
+            for train_func, ideal_func in best_functions.items():
+                ideal_value = ideal_data.loc[index, ideal_func]
 
-    # Step 2: Map test data
-    mapper = TestMapper()
+                deviation = mapper.calculate_deviation(y_test, ideal_value)
 
-    mapped_results = []
+                mapped_results.append({
+                    "x": x_test,
+                    "y": y_test,
+                    "ideal_function": ideal_func,
+                    "deviation": deviation
+                })
 
-    for index, row in test_data.iterrows():
+        print("\nTest Mapping Results:")
+        print(mapped_results[:10])
 
-        x_test = row["x"]
-        y_test = row["y"]
+        # Convert mapping results into DataFrame
+        results_df = pd.DataFrame(mapped_results)
 
-        for train_func, ideal_func in best_functions.items():
+        # Create database connection
+        db = DatabaseManager()
 
-            ideal_value = ideal_data.loc[index, ideal_func]
+        # Save datasets to database
+        db.save_training_data(train_data)
+        db.save_ideal_functions(ideal_data)
+        db.save_test_results(results_df)
 
-            deviation = mapper.calculate_deviation(y_test, ideal_value)
+        # Visualization
+        visualizer = Visualizer()
+        visualizer.plot_data(train_data, ideal_data, test_data)
 
-            mapped_results.append({
-                "x": x_test,
-                "y": y_test,
-                "ideal_function": ideal_func,
-                "deviation": deviation
-            })
+        print("Project version updated")
 
-    print("\nTest Mapping Results:")
-    print(mapped_results[:10])
-    
-    # Convert mapping results into DataFrame
-    
-    results_df = pd.DataFrame(mapped_results)
+    except FileNotFoundError as e:
+        print("Error: One of the data files was not found.", e)
 
-    # Create database connection
-    db = DatabaseManager()
-
-    # Save datasets to database
-    db.save_training_data(train_data)
-    db.save_ideal_functions(ideal_data)
-    # Save results into database
-    db.save_test_results(results_df)
-
-    visualizer = Visualizer()
-    visualizer.plot_data(train_data, ideal_data, test_data)
-
-    print("Project version updated")
+    except Exception as e:
+        print("An unexpected error occurred:", e)
 
 if __name__ == "__main__":
     main()
+
+        
